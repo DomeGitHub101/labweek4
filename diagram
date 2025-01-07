@@ -1,0 +1,45 @@
+classDiagram
+    class Bank
+    class User
+    class Account
+    class ATMCard
+    class Transaction
+
+    class ATMMachine{
+        cash = 1,000,000
+    }
+    class Account{
+        Deposit()
+        Withdraw()
+        Transfer()
+    }
+
+    User : -String citizen_id
+    User : -String name
+
+
+    Account : -String account_number
+    Account : -Owner User
+    Account : -Float money
+    Account : -String transaction_info
+    Account --> Transaction
+    Account --> User
+
+
+    ATMCard <--> Account
+    ATMCard : -Owner Account
+    ATMCard : -String pin
+
+    Transaction --o Account
+    Transaction : -String type_info
+    Transaction : -String money_info
+    Transaction : -String atm_id_info
+    Transaction : -String account_id_tranfer_info
+
+    ATMMachine  --> Transaction
+    ATMMachine : -String atm_id
+    ATMMachine : -Int-cash
+
+
+    User --o Bank
+    ATMMachine --o Bank
