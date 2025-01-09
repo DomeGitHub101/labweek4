@@ -15,6 +15,7 @@ class User:
     @property
     def accounts(self):
         return self.__accounts
+    
 
     def add_account(self, account):
         if isinstance(account, Account):
@@ -26,7 +27,8 @@ class Account:
         self.__account_number = account_number
         self.__owner = owner
         self.__balance = initial_balance
-
+        self.__transaction = []
+        self.__daily_withdrawal_total = 0
 
     @property
     def account_number(self):
@@ -43,6 +45,25 @@ class Account:
     @balance.setter
     def balance(self, value: float):
         self.__balance = value
+
+    @property
+    def transaction(self):
+        return self.__transaction
+    
+    @property
+    def daily_withdrawal_total(self):
+        return self.__daily_withdrawal_total
+    
+    @daily_withdrawal_total.setter
+    def daily_withdrawal_total(self,daily : float):
+        self.__daily_withdrawal_total = daily
+
+    def record_transaction(self, transaction : str):
+        return self.__transaction.append(transaction)
+    
+    def show_transactions(self):
+        for transaction in self.transaction:
+            print(f"{transaction}")
     
     
 
@@ -67,9 +88,9 @@ class ATMCard:
 
 
 class ATMMachine:
-    def __init__(self, machine_id: str, initial_amount: float):
+    def __init__(self, machine_id: str, cash_available: float):
         self.__machine_id = machine_id
-        self.__cash_available = initial_amount
+        self.__cash_available = cash_available
 
     @property
     def machine_id(self):
@@ -86,10 +107,10 @@ class ATMMachine:
                 if card and card.card_number == card_number:
                     if card.pin == entered_pin:
                         print(f"{card.card_number}, {card.account.account_number}, Success")
-                        return
+                        return account
                     else:
                         print("Invalid PIN")
-                        return
+                        return None
         print("Card Not Found")
 
     def deposit(self,bank : "Bank", acc : str,amount : float):
@@ -103,6 +124,8 @@ class ATMMachine:
                         print(f"{user.name} account before deposit: {account.balance}")
                         account.balance += amount
                         print(f"{user.name} account after deposit: {account.balance}")
+                        transaction = f"{user.name} transaction : D-ATM:{self.machine_id}-{amount}-{account.balance}"
+                        account.record_transaction(transaction)
                         return "Success"
             return print("Error: Account not found")
 
@@ -110,15 +133,60 @@ class ATMMachine:
         for user in bank.user_list:
                 for account in user.accounts:
                     if account.account_number == acc:
+                        if amount > self.cash_available:
+                            return "ATM has insufficient funds"
+                        if account.daily_withdrawal_total + amount > 40000:
+                            return "Exceeds daily withdrawal limit of 40,000 baht"
                         if amount > account.balance:
                             return print("Error")
                         else:
                             print(f"{user.name} account before deposit: {account.balance}")
                             account.balance -= amount
+                            account.daily_withdrawal_total += amount
                             print(f"{user.name} account after deposit: {account.balance}")
+                            transaction = f"{user.name} transaction : W-ATM:{self.machine_id}-{amount}-{account.balance}"
+                            account.record_transaction(transaction)
                             return "Success"
         return print("Error: Account not found")
+    
+    def tranfer(self,bank : "Bank", from_account : str, to_account : str, amount : float):
+        if amount <= 0:
+            print("Error")
+            return "Error"
         
+        sender = None
+        receiver = None
+
+        for user in bank.user_list:
+            for account in user.accounts:
+                if account.account_number == from_account:
+                    sender = account
+                elif account.account_number == to_account:
+                    receiver = account
+        
+        if not sender:
+            print("Error: Sender account not found")
+            return "Error: Sender not found"
+        if not receiver:
+            print("Error: Receiver account not found")
+            return "Error: Receiver not found"
+        
+        if sender.balance < amount:
+            print("Error: Insufficient funds in sender account")
+            return "Error: Insufficient funds"
+                   
+        print(f"{sender.owner.name} account before transfer: {sender.balance}")
+        sender.balance -= amount
+        print(f"{sender.owner.name} account after transfer: {sender.balance}")
+        print(f"{receiver.owner.name} account before transfer: {receiver.balance}")
+        receiver.balance += amount
+        print(f"{receiver.owner.name} account before transfer: {receiver.balance}")
+        sender_transaction = f"{sender.owner.name} transaction :TW-ATM:{self.machine_id}-{amount}-{sender.balance}"
+        receiver_transaction = f"{receiver.owner.name} transaction : TD-ATM:{self.machine_id}-{amount}-{receiver.balance}"
+        sender.record_transaction(sender_transaction)
+        receiver.record_transaction(receiver_transaction)
+
+        return "Success"
 
 
 class Bank:
@@ -138,7 +206,8 @@ class Bank:
 
     def atm_data(self, atm_info: dict):
         for machine_id, initial_cash in atm_info.items():
-            self.__atm_list.append(ATMMachine(machine_id, initial_cash))
+            atm = ATMMachine(machine_id, initial_cash)
+            self.__atm_list.append(atm)
 
     @property
     def user_list(self):
@@ -214,6 +283,9 @@ print("\n-----------------------\n")
 # Test case #6 : ทดสอบการโอนเงินจากบัญชีของ Harry ไปยัง Hermione จำนวน 10000 บาท ในเครื่อง atm เครื่องที่ 2
 # ให้เรียกใช้ method ที่ทำการโอนเงิน
 # ผลที่คาดหวัง : แสดงจำนวนเงินในบัญชีของ Harry ก่อนถอน หลังถอน และ แสดงจำนวนเงินในบัญชีของ Hermione ก่อนถอน หลังถอน แสดง transaction
+print("Test case #6\n")
+bank.atm_list[1].tranfer(bank,"1234567890","0987654321",10000)
+print("\n-----------------------\n")
 # Harry account before test : 20000
 # Harry account after test : 10000
 # Hermione account before test : 1500
@@ -222,6 +294,13 @@ print("\n-----------------------\n")
 
 # Test case #7 : แสดง transaction ของ Hermione ทั้งหมด 
 # ผลที่คาดหวัง
+print("Test case #7\n")
+for user in bank.user_list:
+    if user.name == "Hermione Jean Granger":
+        hermione_account = user.accounts[0]
+        break
+hermione_account.show_transactions()
+print("\n-----------------------\n")
 # Hermione transaction : D-ATM:1002-1000-2000
 # Hermione transaction : W-ATM:1002-500-1500
 # Hermione transaction : TD-ATM:1002-10000-11500
@@ -230,6 +309,9 @@ print("\n-----------------------\n")
 # ให้เรียกใช้ method ที่ทำการ insert card และตรวจสอบ PIN
 # atm_machine = bank.get_atm('1001')
 # test_result = atm_machine.insert_card('12345', '9999')  # ใส่ PIN ผิด
+print("Test case #8\n")
+bank.atm_list[0].input_atm_card(bank, '12345', '9999')
+print("\n-----------------------\n")
 # ผลที่คาดหวัง
 # Invalid PIN
 
@@ -245,6 +327,24 @@ print("\n-----------------------\n")
 # print(f"Actual result: {result}")
 # print(f"Harry account after test: {account.get_balance()}")
 # print("-------------------------")
+print("Test case #9 : ทดสอบการถอนเงินเกินวงเงินต่อวัน (40,000 บาท)\n")
+atm_machine = bank.atm_list[0]
+account = atm_machine.input_atm_card(bank, '12345', '1234')  # ใส่ PIN ถูกต้อง
+
+if account:
+    harry_balance_before = account.balance
+    print(f"Harry account before test: {harry_balance_before}")
+
+    # ทดสอบการถอนเงิน 45,000 บาท (เกินวงเงินรายวัน)
+    print("Attempting to withdraw 45,000 baht...")
+    result = atm_machine.withdraw(bank, "1234567890", 45000)
+    print(f"Expected result: Exceeds daily withdrawal limit of 40,000 baht")
+    print(f"Actual result: {result}")
+    print(f"Harry account after test: {account.balance}")
+else:
+    print("Account not found or invalid PIN")
+print("\n-----------------------\n")
+
 
 # Test case #10 : ทดสอบการถอนเงินเมื่อเงินในตู้ ATM ไม่พอ
 # atm_machine = bank.get_atm('1002')  # สมมติว่าตู้ที่ 2 มีเงินเหลือ 200,000 บาท
@@ -258,6 +358,17 @@ print("\n-----------------------\n")
 # print(f"Actual result: {result}")
 # print(f"ATM machine balance after: {atm_machine.get_balance()}")
 # print("-------------------------")
+print("Test case #10\n")
+atm_machine = bank.atm_list[1]
+account = atm_machine.input_atm_card(bank, '12345', '1234')
+print(f"ATM machine balance before: {atm_machine.cash_available}")
+print("Attempting to withdraw 250,000 baht...")
+result = atm_machine.withdraw(bank, "1234567890", 250000)
+print(f"Expected result: ATM has insufficient funds")
+print(f"Actual result: {result}")
+print(f"ATM machine balance after: {atm_machine.cash_available}")
+print("\n-----------------------\n")
+
 
 
 
